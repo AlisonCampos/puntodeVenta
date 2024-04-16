@@ -1,0 +1,170 @@
+﻿@model puntodeventa.Models.VentaModel
+
+@{
+    ViewBag.Title = "Crear Venta";
+}
+
+<h2>@ViewBag.Title</h2>
+
+@using (Html.BeginForm("FinalizarVenta", "Ventas", FormMethod.Post))
+{
+    <div class="form-group">
+        <label for="categoriaSelect">Categoría:</label>
+        @Html.DropDownList("CategoriaSeleccionada",
+            new SelectList(ViewBag.Categorias, "Value", "Text"),
+            "Seleccione una Categoría",
+            new { id = "categoriaSelect", @class = "form-control" })
+    </div>
+
+
+    <div class="form-group">
+        <label for="subcategoriaSelect">Subcategoría:</label>
+        @Html.DropDownList("SubcategoriaSeleccionada",
+            new SelectList(Enumerable.Empty<SelectListItem>()),
+            "Seleccione una Subcategoría",
+            new { id = "subcategoriaSelect", @class = "form-control" })
+    </div>
+
+    <div class="form-group">
+        <label for="productoSelect">Producto:</label>
+        @Html.DropDownList("ProductoSeleccionado",
+            new SelectList(Enumerable.Empty<SelectListItem>()),
+            "Seleccione un Producto",
+            new { id = "productoSelect", @class = "form-control" })
+    </div>
+
+    <div class="form-group">
+        <label for="stock">Stock:</label>
+        <input type="text" id="stockProducto" class="form-control" readonly />
+    </div>
+
+    <div class="form-group">
+        <label for="precio">Precio Unitario:</label>
+        <input type="text" id="precioProducto" class="form-control" readonly />
+    </div>
+
+    <div class="form-group">
+        <label for="cantidad">Cantidad:</label>
+        <input type="number" id="cantidad" class="form-control" min="1" value="1" />
+    </div>
+
+    <button type="button" id="agregarBtn" class="btn btn-primary">Agregar al Carrito</button>
+
+    <table id="carrito" class="table">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio Unitario</th>
+                <th>Subtotal</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <button type="button" id="finalizarVentaBtn" class="btn btn-success">Finalizar Venta</button>
+}
+@section Scripts {
+    <script src="~/Scripts/jquery-3.4.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+$(document).ready(function () {
+    $('#categoriaSelect').change(function () {
+        var categoriaId = $(this).val();
+        $.ajax({
+            url: '@Url.Action("GetSubcategorias", "Ventas")',
+            data: { idProCatCategoria: categoriaId },
+            success: function (data) {
+                $('#subcategoriaSelect').empty().append('<option value="">Seleccione una Subcategoría</option>');
+                $.each(data, function (i, subcategoria) {
+                    $('#subcategoriaSelect').append($('<option></option>').val(subcategoria.id).html(subcategoria.nombre));
+                });
+            }
+        });
+    });
+
+    $('#subcategoriaSelect').change(function () {
+        var subcategoriaId = $(this).val();
+        $.ajax({
+            url: '@Url.Action("GetProductos", "Ventas")',
+            data: { idProCatSubcategoria: subcategoriaId },
+            success: function (data) {
+                $('#productoSelect').empty().append('<option value="">Seleccione un Producto</option>');
+                $.each(data, function (i, producto) {
+                    $('#productoSelect').append($('<option></option>').val(producto.id).html(producto.nombreProducto));
+                });
+            }
+        });
+    });
+
+    $('#productoSelect').change(function () {
+        var productoId = $(this).val();
+        $.ajax({
+            url: '@Url.Action("GetDetallesProducto", "Ventas")',
+            data: { idProProducto: productoId },
+            success: function (data) {
+                $('#stockProducto').val(data.stock);
+                $('#precioProducto').val(data.precio);
+            }
+        });
+    });
+
+    $('#agregarBtn').click(function () {
+        var producto = $('#productoSelect option:selected').text();
+        var cantidad = $('#cantidad').val();
+        var precio = $('#precioProducto').val();
+        var subtotal = cantidad * precio;
+        $('#carrito tbody').append('<tr><td>' + producto + '</td><td>' + cantidad + '</td><td>' + precio + '</td><td>' + subtotal + '</td><td><button class="btn btn-danger remove-item">Eliminar</button></td></tr>');
+    });
+
+    $(document).on('click', '.remove-item', function () {
+        $(this).closest('tr').remove();
+    });
+
+    $('#finalizarVentaBtn').click(function () {
+        var productos = [];
+        $('#carrito tbody tr').each(function () {
+            productos.push({
+                IdProProducto: $(this).find('td:eq(0)').data('id'),
+                Cantidad: $(this).find('td:eq(1)').text(),
+                Total: $(this).find('td:eq(3)').text()
+            });
+        });
+
+        $.ajax({
+            url: '@Url.Action("FinalizarVenta", "Ventas")',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ Productos: productos }),
+            success: function (response) {
+                if (response.success) {
+                    Swal.fire({
+                        title: '¡Éxito!',
+                        text: response.message,
+                        icon: 'success',
+                        confirmButtonText: 'OK'
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Error',
+                        text: response.message,
+                        icon: 'error',
+                        confirmButtonText: 'OK'
+                    });
+                }
+            },
+            error: function (xhr, status, error) {
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Hubo un problema con la solicitud.',
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+            }
+        });
+    });
+});
+    </script>
+}
